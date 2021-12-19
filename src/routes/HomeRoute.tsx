@@ -9,6 +9,8 @@ import { ERC_20_ABI } from '~/utils/abi'
 import { sequenceContext } from '@0xsequence/network'
 
 import { configureLogger } from '@0xsequence/utils'
+import { ExchangeContract__factory } from '~/ExchangeContract__factory'
+import { hexConcat } from '@ethersproject/bytes'
 configureLogger({ logLevel: 'DEBUG' })
 
 const HomeRoute = () => {
@@ -59,14 +61,14 @@ const HomeRoute = () => {
       // keepWalletOpened: true
     })
 
-    console.warn('connectDetails', {connectDetails})
+    console.warn('connectDetails', { connectDetails })
 
     if (authorize) {
       const ethAuth = new ETHAuth()
 
       const decodedProof = await ethAuth.decodeProof(connectDetails.proof.proofString, true)
 
-      console.warn({decodedProof})
+      console.warn({ decodedProof })
 
       const isValid = await wallet.commands.isValidTypedDataSignature(
         await wallet.getAddress(),
@@ -207,7 +209,7 @@ And that has made all the difference.`
   const signAuthMessage = async () => {
     console.log('signing message on AuthChain...')
     const signer = await wallet.getAuthSigner()
-    
+
     const message = 'Hi there! Please sign this message, 123456789, thanks.'
 
     // sign
@@ -265,15 +267,15 @@ And that has made all the difference.`
       },
       types: {
         'Person': [
-          {name: "name", type: "string"},
-          {name: "wallet", type: "address"}
+          { name: "name", type: "string" },
+          { name: "wallet", type: "address" }
         ]
-      },  
+      },
       message: {
         'name': 'Bob',
         'wallet': '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
       }
-    }    
+    }
 
     const signer = wallet.getSigner()
 
@@ -417,13 +419,13 @@ And that has made all the difference.`
     console.log(`balance of ${toAddress}, after:`, await provider.getBalance(toAddress))
   }
 
-  const sendDAI = async(signer?: sequence.provider.Web3Signer) => {
+  const sendDAI = async (signer?: sequence.provider.Web3Signer) => {
     signer = signer || wallet.getSigner() // select DefaultChain signer by default
 
     const toAddress = ethers.Wallet.createRandom().address
 
     const amount = ethers.utils.parseUnits('5', 18)
-    
+
     const daiContractAddress = '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063' // (DAI address on Polygon)
 
     const tx: sequence.transactions.Transaction = {
@@ -455,6 +457,137 @@ And that has made all the difference.`
   //   console.log('TODO')
   // }
 
+
+  const signZeroXOrder = async () => {
+    const opptAddr = prompt("Enter address of other wallet")
+    if (!opptAddr) {
+      return
+    }
+    console.log('signing 0x order...')
+    const addr = await wallet.getAddress()
+
+    const typedData: sequence.utils.TypedData = {
+      domain: {
+        name: "0x Protocol",
+        version: "3.0.0",
+        chainId: (137).toString(10),
+        verifyingContract: "0x0C58C1170f1DEd633862A1166f52107490a9C594",
+      },
+      types: {
+        Order: [
+          { name: "makerAddress", type: "address" },
+          { name: "takerAddress", type: "address" },
+          { name: "feeRecipientAddress", type: "address" },
+          { name: "senderAddress", type: "address" },
+          { name: "makerAssetAmount", type: "uint256" },
+          { name: "takerAssetAmount", type: "uint256" },
+          { name: "makerFee", type: "uint256" },
+          { name: "takerFee", type: "uint256" },
+          { name: "expirationTimeSeconds", type: "uint256" },
+          { name: "salt", type: "uint256" },
+          { name: "makerAssetData", type: "bytes" },
+          { name: "takerAssetData", type: "bytes" },
+          { name: "makerFeeAssetData", type: "bytes" },
+          { name: "takerFeeAssetData", type: "bytes" },
+        ],
+      },
+      message: {
+        makerAddress: addr,
+        takerAddress: opptAddr,
+        feeRecipientAddress: "0xbcc02a155c374263321155555ccf41070017649e",
+        senderAddress: "0x0000000000000000000000000000000000000000",
+        makerAssetAmount: "1",
+        takerAssetAmount: "1",
+        makerFee: "0",
+        takerFee: "0",
+        expirationTimeSeconds: "2524604400",
+        salt: "115380666899310060419877138308806825568483898259101034972323470300764229119045",
+        makerAssetData: "0x94cfcdd70000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000024f47261b0000000000000000000000000be41c134fc3517cb0ec94b6eeafb66cf9998782f00000000000000000000000000000000000000000000000000000000",
+        takerAssetData: "0x94cfcdd70000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000024f47261b0000000000000000000000000aaa5b9e6c589642f98a1cda99b9d024b8407285a00000000000000000000000000000000000000000000000000000000",
+        makerFeeAssetData: "0x",
+        takerFeeAssetData: "0x"
+      }
+    }
+
+    const signer = wallet.getSigner()
+
+    const sig = await signer.signTypedData(typedData.domain, typedData.types, typedData.message)
+    // const sig = await wallet.commands.signTypedData(typedData.domain, typedData.types, typedData.value)
+    console.log('0x order signature:', sig)
+
+    // validate
+    const isValid = await wallet.commands.isValidTypedDataSignature(
+      await wallet.getAddress(),
+      typedData,
+      sig,
+      await signer.getChainId()
+    )
+    console.log('isValid?', isValid)
+    if (!isValid) throw new Error('sig invalid')
+
+    console.log("Here is the signed order, copy it.")
+    console.log(JSON.stringify({ ...typedData.message, signature: sig }))
+  }
+
+  interface Order {
+    makerAddress: string;
+    takerAddress: string;
+    feeRecipientAddress: string;
+    senderAddress: string;
+    makerAssetAmount: string;
+    takerAssetAmount: string;
+    makerFee: string;
+    takerFee: string;
+    expirationTimeSeconds: string;
+    salt: string;
+    makerAssetData: string;
+    takerAssetData: string;
+    makerFeeAssetData: string;
+    takerFeeAssetData: string;
+    signature?: string;
+  }
+  const normalizeOrder = (order: Order): Order => {
+    return {
+      makerAddress: order.makerAddress.toLowerCase(),
+      takerAddress: order.takerAddress.toLowerCase(),
+      feeRecipientAddress: order.feeRecipientAddress.toLowerCase(),
+      senderAddress: order.senderAddress.toLowerCase(),
+      makerAssetAmount: order.makerAssetAmount.toString(),
+      takerAssetAmount: order.takerAssetAmount.toString(),
+      makerFee: order.makerFee.toString(),
+      takerFee: order.takerFee.toString(),
+      expirationTimeSeconds: order.expirationTimeSeconds.toString(),
+      salt: order.salt.toString(),
+      makerAssetData: order.makerAssetData.toLowerCase(),
+      takerAssetData: order.takerAssetData.toLowerCase(),
+      makerFeeAssetData: order.makerFeeAssetData.toLowerCase(),
+      takerFeeAssetData: order.takerFeeAssetData.toLowerCase(),
+      signature: order.signature?.toLowerCase(),
+    };
+  };
+
+
+
+  const submitSignedZeroXOrder = async () => {
+    const signedOrderString = prompt('enter signed order string from other wallet');
+    if (!signedOrderString) {
+      return ''
+    }
+    const signedOrder = JSON.parse(signedOrderString)
+
+    const exchangeContract = ExchangeContract__factory.connect(
+      '0x0C58C1170f1DEd633862A1166f52107490a9C594',
+      wallet.getSigner()
+    );
+    const transaction = await exchangeContract.fillOrKillOrder(
+      normalizeOrder(signedOrder),
+      signedOrder.takerAssetAmount,
+      hexConcat([signedOrder.signature, '0x07'])
+    );
+    console.log("attempting fill order:", transaction)
+    return transaction;
+  }
+
   return (
     <Box sx={{
       width: '80%',
@@ -463,7 +596,7 @@ And that has made all the difference.`
       color: 'black',
       my: '50px'
     }}>
-      <h1 style={{ color: 'white', marginBottom: '10px' }}>Demo Dapp ({network && network.length > 0 ? network : 'mainnet' })</h1>
+      <h1 style={{ color: 'white', marginBottom: '10px' }}>Demo Dapp ({network && network.length > 0 ? network : 'mainnet'})</h1>
 
       <p style={{ color: 'white', marginBottom: '14px', fontSize: '14px', fontStyle: 'italic' }}>Please open your browser dev inspector to view output of functions below</p>
 
@@ -501,6 +634,11 @@ And that has made all the difference.`
         <Button px={3} m={1} onClick={() => send1155Tokens()}>Send ERC-1155 Tokens</Button>
         {/* <Button px={3} m={1} onClick={() => sendBatchTransaction()}>Send Batch Txns</Button> */}
       </p>
+      <h1>
+        0x tests:
+        <Button px={3} m={1} onClick={() => signZeroXOrder()}>Sign 0x Order</Button>
+        <Button px={3} m={1} onClick={() => submitSignedZeroXOrder()}>Submit Signed 0x Order</Button>
+      </h1>
 
     </Box>
   )
