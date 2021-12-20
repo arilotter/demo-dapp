@@ -8,7 +8,7 @@ import { ETHAuth, Proof } from '@0xsequence/ethauth'
 import { ERC_20_ABI } from '~/utils/abi'
 import { sequenceContext } from '@0xsequence/network'
 
-import { configureLogger } from '@0xsequence/utils'
+import { configureLogger, TypedData } from '@0xsequence/utils'
 import { ExchangeContract__factory } from '~/ExchangeContract__factory'
 import { hexConcat } from '@ethersproject/bytes'
 configureLogger({ logLevel: 'DEBUG' })
@@ -511,14 +511,114 @@ And that has made all the difference.`
 
     const signer = wallet.getSigner()
 
-    const sig = await signer.signTypedData(typedData.domain, typedData.types, typedData.message)
-    // const sig = await wallet.commands.signTypedData(typedData.domain, typedData.types, typedData.value)
+    const orderHash = sequence.utils.encodeTypedDataHash(typedData)
+    console.log("Order hash", orderHash)
+
+    const EIP1271DataAbi = [
+      {
+        "inputs": [
+          {
+            "components": [
+              {
+                "internalType": "address",
+                "name": "makerAddress",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "takerAddress",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "feeRecipientAddress",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "senderAddress",
+                "type": "address"
+              },
+              {
+                "internalType": "uint256",
+                "name": "makerAssetAmount",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "takerAssetAmount",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "makerFee",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "takerFee",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "expirationTimeSeconds",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "salt",
+                "type": "uint256"
+              },
+              {
+                "internalType": "bytes",
+                "name": "makerAssetData",
+                "type": "bytes"
+              },
+              {
+                "internalType": "bytes",
+                "name": "takerAssetData",
+                "type": "bytes"
+              },
+              {
+                "internalType": "bytes",
+                "name": "makerFeeAssetData",
+                "type": "bytes"
+              },
+              {
+                "internalType": "bytes",
+                "name": "takerFeeAssetData",
+                "type": "bytes"
+              }
+            ],
+            "internalType": "struct IEIP1271Data.Order",
+            "name": "order",
+            "type": "tuple"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "orderHash",
+            "type": "bytes32"
+          }
+        ],
+        "name": "OrderWithHash",
+        "outputs": [],
+        "stateMutability": "pure",
+        "type": "function"
+      }
+    ]
+
+    const msg = new ethers.utils.Interface(EIP1271DataAbi).encodeFunctionData('OrderWithHash', [typedData.message, orderHash])
+    console.log("0x sign msg", msg)
+
+    console.log("message diggest", ethers.utils.hexlify(sequence.utils.encodeMessageDigest(msg)))
+
+    const sig = await signer.signMessage(ethers.utils.arrayify(msg), 137)
     console.log('0x order signature:', sig)
 
     // validate
-    const isValid = await wallet.commands.isValidTypedDataSignature(
+    const isValid = await wallet.commands.isValidMessageSignature(
       await wallet.getAddress(),
-      typedData,
+      ethers.utils.arrayify(msg),
       sig,
       await signer.getChainId()
     )
