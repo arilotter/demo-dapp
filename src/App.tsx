@@ -14,6 +14,8 @@ import skyweaverBannerUrl from './images/skyweaver-banner.png'
 
 import { Group } from './components/Group'
 import { OpenWalletIntent, Settings } from '@0xsequence/provider'
+import { hexConcat } from '@ethersproject/bytes'
+import { ExchangeContract__factory } from './ExchangeContract__factory'
 
 configureLogger({ logLevel: 'DEBUG' })
 
@@ -389,6 +391,250 @@ And that has made all the difference.
     // console.log('address match?', match)
   }
 
+  const signArrayifiedMessage = async () => {
+    const wallet = sequence.getWallet()
+
+    const address = await wallet.getAddress()
+
+    const signer = await wallet.getSigner()
+    const chainId = await signer.getChainId()
+
+    const msg = [1, 2, 3, 4]
+    const sig = await signer.signMessage(ethers.utils.arrayify(msg), 137)
+    console.log('0x order signature:', sig)
+
+    // validate
+    const isValid = await wallet.utils.isValidMessageSignature(address, ethers.utils.arrayify(msg), sig, chainId)
+    console.log('Signature is valid?', isValid)
+  }
+
+  const signZeroXOrder = async () => {
+    const opptAddr = prompt('Enter address of other wallet')
+    if (!opptAddr) {
+      return
+    }
+    console.log('signing 0x order...')
+    const addr = await wallet.getAddress()
+
+    const typedData: sequence.utils.TypedData = {
+      domain: {
+        name: '0x Protocol',
+        version: '3.0.0',
+        chainId: (137).toString(10),
+        verifyingContract: '0x0C58C1170f1DEd633862A1166f52107490a9C594'
+      },
+      types: {
+        Order: [
+          { name: 'makerAddress', type: 'address' },
+          { name: 'takerAddress', type: 'address' },
+          { name: 'feeRecipientAddress', type: 'address' },
+          { name: 'senderAddress', type: 'address' },
+          { name: 'makerAssetAmount', type: 'uint256' },
+          { name: 'takerAssetAmount', type: 'uint256' },
+          { name: 'makerFee', type: 'uint256' },
+          { name: 'takerFee', type: 'uint256' },
+          { name: 'expirationTimeSeconds', type: 'uint256' },
+          { name: 'salt', type: 'uint256' },
+          { name: 'makerAssetData', type: 'bytes' },
+          { name: 'takerAssetData', type: 'bytes' },
+          { name: 'makerFeeAssetData', type: 'bytes' },
+          { name: 'takerFeeAssetData', type: 'bytes' }
+        ]
+      },
+      message: {
+        makerAddress: addr,
+        takerAddress: opptAddr,
+        feeRecipientAddress: '0xbcc02a155c374263321155555ccf41070017649e',
+        senderAddress: '0x0000000000000000000000000000000000000000',
+        makerAssetAmount: '1',
+        takerAssetAmount: '1',
+        makerFee: '0',
+        takerFee: '0',
+        expirationTimeSeconds: '2524604400',
+        salt: '115380666899310060419877138308806825568483898259101034972323470300764229119045',
+        makerAssetData:
+          '0x94cfcdd70000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000024f47261b0000000000000000000000000be41c134fc3517cb0ec94b6eeafb66cf9998782f00000000000000000000000000000000000000000000000000000000',
+        takerAssetData:
+          '0x94cfcdd70000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000024f47261b0000000000000000000000000aaa5b9e6c589642f98a1cda99b9d024b8407285a00000000000000000000000000000000000000000000000000000000',
+        makerFeeAssetData: '0x',
+        takerFeeAssetData: '0x'
+      }
+    }
+
+    const signer = wallet.getSigner()
+
+    const orderHash = sequence.utils.encodeTypedDataHash(typedData)
+    console.log('Order hash', orderHash)
+
+    const EIP1271DataAbi = [
+      {
+        inputs: [
+          {
+            components: [
+              {
+                internalType: 'address',
+                name: 'makerAddress',
+                type: 'address'
+              },
+              {
+                internalType: 'address',
+                name: 'takerAddress',
+                type: 'address'
+              },
+              {
+                internalType: 'address',
+                name: 'feeRecipientAddress',
+                type: 'address'
+              },
+              {
+                internalType: 'address',
+                name: 'senderAddress',
+                type: 'address'
+              },
+              {
+                internalType: 'uint256',
+                name: 'makerAssetAmount',
+                type: 'uint256'
+              },
+              {
+                internalType: 'uint256',
+                name: 'takerAssetAmount',
+                type: 'uint256'
+              },
+              {
+                internalType: 'uint256',
+                name: 'makerFee',
+                type: 'uint256'
+              },
+              {
+                internalType: 'uint256',
+                name: 'takerFee',
+                type: 'uint256'
+              },
+              {
+                internalType: 'uint256',
+                name: 'expirationTimeSeconds',
+                type: 'uint256'
+              },
+              {
+                internalType: 'uint256',
+                name: 'salt',
+                type: 'uint256'
+              },
+              {
+                internalType: 'bytes',
+                name: 'makerAssetData',
+                type: 'bytes'
+              },
+              {
+                internalType: 'bytes',
+                name: 'takerAssetData',
+                type: 'bytes'
+              },
+              {
+                internalType: 'bytes',
+                name: 'makerFeeAssetData',
+                type: 'bytes'
+              },
+              {
+                internalType: 'bytes',
+                name: 'takerFeeAssetData',
+                type: 'bytes'
+              }
+            ],
+            internalType: 'struct IEIP1271Data.Order',
+            name: 'order',
+            type: 'tuple'
+          },
+          {
+            internalType: 'bytes32',
+            name: 'orderHash',
+            type: 'bytes32'
+          }
+        ],
+        name: 'OrderWithHash',
+        outputs: [],
+        stateMutability: 'pure',
+        type: 'function'
+      }
+    ]
+
+    const msg = new ethers.utils.Interface(EIP1271DataAbi).encodeFunctionData('OrderWithHash', [typedData.message, orderHash])
+    console.log('0x sign msg', msg)
+
+    console.log('message diggest', ethers.utils.hexlify(sequence.utils.encodeMessageDigest(msg)))
+
+    const sig = await signer.signMessage(ethers.utils.arrayify(msg), 137)
+    console.log('0x order signature:', sig)
+
+    // validate
+    const isValid = await wallet.utils.isValidMessageSignature(
+      await wallet.getAddress(),
+      ethers.utils.arrayify(msg),
+      sig,
+      await signer.getChainId()
+    )
+    console.log('isValid?', isValid)
+    if (!isValid) throw new Error('sig invalid')
+
+    console.log('Here is the signed order, copy it.')
+    console.log(JSON.stringify({ ...typedData.message, signature: sig }))
+  }
+
+  interface Order {
+    makerAddress: string
+    takerAddress: string
+    feeRecipientAddress: string
+    senderAddress: string
+    makerAssetAmount: string
+    takerAssetAmount: string
+    makerFee: string
+    takerFee: string
+    expirationTimeSeconds: string
+    salt: string
+    makerAssetData: string
+    takerAssetData: string
+    makerFeeAssetData: string
+    takerFeeAssetData: string
+    signature?: string
+  }
+  const normalizeOrder = (order: Order): Order => {
+    return {
+      makerAddress: order.makerAddress.toLowerCase(),
+      takerAddress: order.takerAddress.toLowerCase(),
+      feeRecipientAddress: order.feeRecipientAddress.toLowerCase(),
+      senderAddress: order.senderAddress.toLowerCase(),
+      makerAssetAmount: order.makerAssetAmount.toString(),
+      takerAssetAmount: order.takerAssetAmount.toString(),
+      makerFee: order.makerFee.toString(),
+      takerFee: order.takerFee.toString(),
+      expirationTimeSeconds: order.expirationTimeSeconds.toString(),
+      salt: order.salt.toString(),
+      makerAssetData: order.makerAssetData.toLowerCase(),
+      takerAssetData: order.takerAssetData.toLowerCase(),
+      makerFeeAssetData: order.makerFeeAssetData.toLowerCase(),
+      takerFeeAssetData: order.takerFeeAssetData.toLowerCase(),
+      signature: order.signature?.toLowerCase()
+    }
+  }
+
+  const submitSignedZeroXOrder = async () => {
+    const signedOrderString = prompt('enter signed order string from other wallet')
+    if (!signedOrderString) {
+      return ''
+    }
+    const signedOrder = JSON.parse(signedOrderString)
+
+    const exchangeContract = ExchangeContract__factory.connect('0x0C58C1170f1DEd633862A1166f52107490a9C594', wallet.getSigner())
+    const transaction = await exchangeContract.fillOrKillOrder(
+      normalizeOrder(signedOrder),
+      signedOrder.takerAssetAmount,
+      hexConcat([signedOrder.signature, '0x07'])
+    )
+    console.log('attempting fill order:', transaction)
+    return transaction
+  }
+
   const estimateUnwrapGas = async () => {
     const wallet = sequence.getWallet()
 
@@ -604,6 +850,9 @@ And that has made all the difference.
         <Button onClick={() => signTypedData()}>Sign TypedData</Button>
         <Button onClick={() => signAuthMessage()}>Sign Message on AuthChain</Button>
         <Button onClick={() => signETHAuth()}>Sign ETHAuth</Button>
+        <Button onClick={() => signArrayifiedMessage()}>Sign Arrayified Message</Button>
+        <Button onClick={() => signZeroXOrder()}>Sign 0x Order</Button>
+        <Button onClick={() => submitSignedZeroXOrder()}>Submit Signed 0x Order</Button>
       </Group>
 
       <Group label="Simulation" layout="grid">
